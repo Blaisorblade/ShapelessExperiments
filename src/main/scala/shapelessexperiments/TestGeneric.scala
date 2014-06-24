@@ -175,3 +175,36 @@ object TestGeneric {
     case class D() extends Term
   }
 }
+
+
+trait ExtensibleSumsv2 {
+  //This is a hackier way — it works better in either Scalac or dotty, but
+  //it does not take advantage with mixin linearization, so independent
+  //extensions do not compose.
+  trait Base {
+    trait Term
+    case class A() extends Term
+    case class B() extends Term
+    // >: Nothing is redundant, just extra explicit
+    type BaseRest >: Nothing <: Coproduct
+
+    type ToGeneric = A :+: B :+: BaseRest
+    //This type is a lie because the function does not handle BaseRest
+    def to(t: Term): ToGeneric =
+      t match {
+        case t1 @ A() => Coproduct[ToGeneric](t1)
+        case t2 @ B() => Coproduct[ToGeneric](t2)
+      }
+    def toRest(t: Term): BaseRest
+  }
+  trait Derived extends Base {
+    type DerivedRest >: Nothing <: Coproduct
+    type BaseRest = C :+: DerivedRest
+    case class C() extends Term
+    override def to(t: Term): ToGeneric =
+      t match {
+        case t3 @ C() => Coproduct[ToGeneric](t3)
+        case _ => super.to(t)
+      }
+  }
+}
